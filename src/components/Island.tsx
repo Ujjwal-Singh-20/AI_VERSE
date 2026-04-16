@@ -91,9 +91,9 @@ export function Island({ url, position, rotation = [0, 0, 0], name, isActive, is
                 className="whitespace-nowrap px-4 py-2 rounded-xl backdrop-blur-md border border-white/20 shadow-2xl flex flex-col items-center gap-1"
                 style={{ background: `${color}22` }}
               >
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50" style={{ color }}>
+                {/* <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50" style={{ color }}>
                   Track_Active
-                </div>
+                </div> */}
                 <div className="text-sm font-black text-white uppercase tracking-tighter font-outfit">
                   {name}
                 </div>
