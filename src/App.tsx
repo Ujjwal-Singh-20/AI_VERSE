@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
@@ -90,8 +90,8 @@ function AppContent() {
               <div className="relative">
                 <motion.button
                   className={`px-5 py-3 rounded-2xl backdrop-blur-xl border-2 transition-all cursor-pointer shadow-xl active:scale-95 flex items-center justify-center ${!hasApiKey
-                      ? "bg-amber-500/20 hover:bg-amber-500/40 text-amber-200 border-amber-400/50"
-                      : "bg-white/20 hover:bg-white/40 text-white border-white/40"
+                    ? "bg-amber-500/20 hover:bg-amber-500/40 text-amber-200 border-amber-400/50"
+                    : "bg-white/20 hover:bg-white/40 text-white border-white/40"
                     }`}
                   onClick={() => setShowSettings(!showSettings)}
                   animate={!hasApiKey ? {
