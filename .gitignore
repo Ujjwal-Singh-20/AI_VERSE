@@ -27,3 +27,4 @@ dist-ssr
 .env
 firestore.rules
 package-lock.json
+backend

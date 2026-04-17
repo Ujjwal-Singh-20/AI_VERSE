@@ -1,4 +1,5 @@
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OceanEnvironment } from './components/OceanEnvironment';
@@ -25,7 +26,15 @@ function AppContent() {
   const { brainrotMode, setBrainrotMode } = useLevels();
   const [activeTrack, setActiveTrack] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(!!localStorage.getItem('gemini_api_key'));
   const navigate = useNavigate();
+
+  // Re-check API key when settings modal closes
+  useEffect(() => {
+    if (!showSettings) {
+      setHasApiKey(!!localStorage.getItem('gemini_api_key'));
+    }
+  }, [showSettings]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -78,12 +87,55 @@ function AppContent() {
                 <Map size={14} />
                 {brainrotMode ? "PROGRESS_RIZZ" : "SUGGESTED_ROUTE"}
               </button>
-              <button
-                className="px-5 py-3 bg-white/20 hover:bg-white/40 text-white rounded-2xl backdrop-blur-xl border-2 border-white/40 transition-all cursor-pointer shadow-xl hover:scale-[1.1] active:scale-95"
-                onClick={() => setShowSettings(!showSettings)}
-              >
-                <Settings size={18} />
-              </button>
+              <div className="relative">
+                <motion.button
+                  className={`px-5 py-3 rounded-2xl backdrop-blur-xl border-2 transition-all cursor-pointer shadow-xl active:scale-95 flex items-center justify-center ${!hasApiKey
+                      ? "bg-amber-500/20 hover:bg-amber-500/40 text-amber-200 border-amber-400/50"
+                      : "bg-white/20 hover:bg-white/40 text-white border-white/40"
+                    }`}
+                  onClick={() => setShowSettings(!showSettings)}
+                  animate={!hasApiKey ? {
+                    scale: [1, 1.1, 1],
+                    boxShadow: [
+                      "0 0 0px rgba(245, 158, 11, 0)",
+                      "0 0 20px rgba(245, 158, 11, 0.4)",
+                      "0 0 0px rgba(245, 158, 11, 0)"
+                    ]
+                  } : { scale: 1 }}
+                  transition={!hasApiKey ? {
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  } : {}}
+                >
+                  <Settings size={18} />
+                </motion.button>
+
+                <AnimatePresence>
+                  {!hasApiKey && (
+                    <>
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-[#f0f8ff] flex items-center justify-center z-[60]"
+                      >
+                        <span className="text-[8px] font-black text-white">!</span>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        className="absolute left-full ml-4 top-1/2 -translate-y-1/2 bg-amber-500 text-white text-[10px] font-black px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg uppercase tracking-wider pointer-events-none"
+                      >
+                        Set API Key
+                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-r-amber-500" />
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
 
             </div>
 

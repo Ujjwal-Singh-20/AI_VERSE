@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLevels } from '../context/LevelContext';
-import { Play, ArrowLeft, Terminal, Bot, CheckCircle, Lock, Book, GripVertical, GripHorizontal, Download, Upload, ExternalLink } from 'lucide-react';
+import { Play, ArrowLeft, Terminal, Bot, CheckCircle, Lock, Book, GripVertical, GripHorizontal, Download, Upload, ExternalLink, RotateCcw } from 'lucide-react';
 import { FileUpload } from '../components/FileUpload';
 import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
@@ -183,10 +183,15 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
     if (!activeLevel || !user) return;
     setRunning(true);
     setStdout('Executing against hidden datasets...\n');
-    setStderr(''); setAiFeedback(null);
+    setStderr(''); setAiFeedback(null); setPassed(null);
     try {
       const token = await user.getIdToken();
       const geminiKey = localStorage.getItem('gemini_api_key') || '';
+      
+      if (!geminiKey) {
+        throw new Error("Missing Gemini API Key. Please set it in the Settings menu (bottom left) to evaluate your code.");
+      }
+
       const payload: any = { level_id: activeLevel.level_id, source_code: code, files: [] };
       if (selectedFile) payload.files.push(selectedFile);
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -209,7 +214,15 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Gemini-Key': geminiKey },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(`API Error: ${await res.text()}`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        if (res.status === 401 || res.status === 400 || errorText.toLowerCase().includes('api key')) {
+          throw new Error(`Authentication Error: ${errorText || "Invalid or missing API key."}`);
+        }
+        throw new Error(`API Error: ${errorText}`);
+      }
+      
       const result = await res.json();
       setStdout(result.stdout || result.test_results?.map((t: any) => `Dataset ${t.dataset}: ${t.passed ? 'PASS' : 'FAIL'}`).join('\n') || '');
       setStderr(result.stderr || '');
@@ -226,7 +239,8 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
         }, { merge: true });
       }
     } catch (e: any) {
-      setStderr(`System Error: ${e.message}`);
+      setStderr(`${e.message}`);
+      setPassed(false);
     } finally {
       setRunning(false);
     }
@@ -258,6 +272,12 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
       URL.revokeObjectURL(url);
     } catch (e: any) {
       alert(`Download error: ${e.message}`);
+    }
+  };
+
+  const handleResetCode = () => {
+    if (activeLevel && window.confirm("Are you sure you want to reset your code to the default state? This cannot be undone.")) {
+      setCode(activeLevel.initial_code || '# Start coding here...');
     }
   };
 
@@ -494,11 +514,21 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
 
           {/* Console toolbar */}
           <div className="h-9 border-b border-white/5 flex items-center justify-between px-4 bg-[#0a0f18] shrink-0">
-            <span className="text-ui-2xs font-black uppercase tracking-[0.2em] font-mono text-slate-500">Console_Output</span>
+            <div className="flex items-center gap-4">
+              <span className="text-ui-2xs font-black uppercase tracking-[0.2em] font-mono text-slate-500">Console_Output</span>
+              <button
+                onClick={handleResetCode}
+                className="text-ui-2xs font-black uppercase tracking-widest font-mono text-slate-500 hover:text-rose-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Reset code to default"
+              >
+                <RotateCcw size={10} />
+                Reset_Code
+              </button>
+            </div>
             <button
               onClick={handleRunAndEvaluate}
               disabled={running || (!selectedFile && activeLevel.execution_mode === 'model')}
-              className={`h-7 px-4 rounded font-black text-ui-2xs uppercase tracking-widest font-mono transition-all flex items-center gap-2 ${running ? 'bg-blue-500/20 text-blue-400 cursor-wait' : (!selectedFile && activeLevel.execution_mode === 'model' ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.4)]')}`}
+              className={`h-7 px-4 rounded font-black text-ui-2xs uppercase tracking-widest font-mono transition-all flex items-center gap-2 ${running ? 'bg-blue-500/20 text-blue-400 cursor-wait' : (!selectedFile && activeLevel.execution_mode === 'model' ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all cursor-pointer')}`}
             >
               {running ? <div className="w-2 h-2 rounded-full border border-blue-400 border-t-transparent animate-spin" /> : <Play size={9} />}
               {running ? 'Executing...' : 'Run_&_Evaluate'}
