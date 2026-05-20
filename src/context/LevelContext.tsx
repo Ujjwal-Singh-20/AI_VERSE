@@ -23,6 +23,7 @@ export interface Level {
   training_dataset_description?: string;
   training_dataset_files?: string[];
   guide_markdown?: string;
+  example_input?: Record<string, unknown>;
 }
 
 export interface TrackData {

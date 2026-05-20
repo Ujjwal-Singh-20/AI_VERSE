@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLevels } from '../context/LevelContext';
-import { Play, ArrowLeft, Terminal, Bot, CheckCircle, Lock, Book, GripVertical, GripHorizontal, Download, Upload, ExternalLink, RotateCcw } from 'lucide-react';
+import { Play, ArrowLeft, Terminal, Bot, CheckCircle, Lock, Book, GripVertical, GripHorizontal, Download, Upload, ExternalLink, RotateCcw, FileCode, ChevronDown, ChevronUp } from 'lucide-react';
 import { FileUpload } from '../components/FileUpload';
 import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
@@ -67,6 +67,182 @@ function Divider({ onMouseDown, axis }: { onMouseDown: (e: React.MouseEvent) => 
   );
 }
 
+// ── Task Parser Helper ──────────────────────────────────────────────────────
+function parseUserTask(taskStr: string) {
+  const lines = taskStr.split('\n');
+  const checklist: string[] = [];
+  let summary = '';
+  let outputSpec = '';
+
+  const hasListPattern = lines.some(line => /^(?:\d+[\.:\)]|\-\s|\*\s|STEP\s+\d+:?)/i.test(line.trim()));
+
+  if (hasListPattern) {
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+
+      if (line.toLowerCase().includes('print json:') || line.toLowerCase().includes('output:')) {
+        outputSpec = line;
+        continue;
+      }
+
+      const match = line.match(/^(?:\d+[\.:\)]|\-\s|\*\s|STEP\s+\d+:?)\s*(.*)/i);
+      if (match) {
+        checklist.push(match[1]);
+      } else {
+        if (checklist.length === 0) {
+          if (summary) summary += '\n' + line;
+          else summary = line;
+        } else {
+          checklist.push(line);
+        }
+      }
+    }
+  } else {
+    const sentences = taskStr
+      .replace(/(\r\n|\n|\r)/gm, " ")
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    if (sentences.length > 0) {
+      summary = sentences[0];
+      for (let i = 1; i < sentences.length; i++) {
+        const sentence = sentences[i];
+        if (sentence.toLowerCase().includes('print json:') || sentence.toLowerCase().includes('output:') || sentence.toLowerCase().startsWith('print ')) {
+          outputSpec = sentence;
+        } else {
+          checklist.push(sentence);
+        }
+      }
+    }
+  }
+
+  if (checklist.length === 0) {
+    checklist.push("Understand the core requirements of this level");
+    checklist.push("Implement your logic in the interactive editor");
+    checklist.push("Run & Evaluate against the hidden test datasets");
+  }
+
+  return {
+    summary: summary || "Complete the implementation below by following the checklist steps.",
+    checklist,
+    outputSpec: outputSpec || ""
+  };
+}
+
+// ── Example Input Viewer ───────────────────────────────────────────────────
+function ExampleInputSection({ exampleInput }: { exampleInput: Record<string, string> }) {
+  const files = Object.entries(exampleInput).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (files.length === 0) return null;
+
+  const [activeFile, setActiveFile] = useState(files[0][0]);
+  const [expanded, setExpanded] = useState(true);
+
+  // Infer a syntax highlight color from the file extension
+  const getFileColor = (filename: string) => {
+    if (filename.endsWith('.json')) return 'text-amber-400';
+    if (filename.endsWith('.csv')) return 'text-emerald-400';
+    if (filename.endsWith('.txt')) return 'text-sky-400';
+    return 'text-slate-400';
+  };
+
+  const activeContent = exampleInput[activeFile];
+
+  return (
+    <section className="bg-[#0B1524]/40 border border-white/8 rounded-2xl overflow-hidden">
+      {/* Header — click to expand/collapse */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/3 transition-colors group"
+      >
+        <div className="flex items-center gap-2.5">
+          <FileCode size={12} className="text-blue-400 shrink-0" />
+          <span className="text-ui-2xs font-black uppercase tracking-[0.2em] font-mono text-blue-400">
+            Example Input
+          </span>
+          <span className="text-[10px] font-mono text-slate-600 bg-white/5 px-1.5 py-0.5 rounded">
+            {files.length} file{files.length > 1 ? 's' : ''}
+          </span>
+        </div>
+        {expanded
+          ? <ChevronUp size={12} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+          : <ChevronDown size={12} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+        }
+      </button>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            {/* File tabs — only rendered if more than one file */}
+            {files.length > 1 && (
+              <div className="flex gap-0 border-t border-white/5 border-b border-white/5 overflow-x-auto">
+                {files.map(([filename]) => (
+                  <button
+                    key={filename}
+                    onClick={() => setActiveFile(filename)}
+                    className={`px-4 py-2 text-ui-2xs font-mono font-black uppercase tracking-wider whitespace-nowrap transition-all shrink-0 border-r border-white/5 ${activeFile === filename
+                        ? 'bg-[#05070A] text-white border-b-2 border-b-blue-500'
+                        : 'bg-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                      }`}
+                  >
+                    <span className={activeFile === filename ? getFileColor(filename) : ''}>
+                      {filename}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Single file label when only one file */}
+            {files.length === 1 && (
+              <div className="flex items-center gap-2 px-4 py-2 border-t border-white/5 bg-[#05070A]/60">
+                <span className={`text-ui-2xs font-mono font-black ${getFileColor(files[0][0])}`}>
+                  {files[0][0]}
+                </span>
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="relative bg-[#03060B] border-t border-white/5">
+              {/* Copy button */}
+              <CopyButton text={activeContent} />
+              <pre className="p-4 pr-14 text-ui-xs font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed max-h-52 overflow-y-auto">
+                <code>{activeContent}</code>
+              </pre>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+// ── Copy button helper ─────────────────────────────────────────────────────
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button
+      onClick={copy}
+      className="absolute top-2.5 right-2.5 text-[10px] font-mono font-black uppercase tracking-wider px-2 py-1 rounded-md bg-white/5 hover:bg-blue-500/20 text-slate-500 hover:text-blue-400 border border-white/5 hover:border-blue-500/30 transition-all z-10"
+    >
+      {copied ? 'Copied!' : 'Copy'}
+    </button>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export const TrackPage = ({ onBack }: { onBack: () => void }) => {
   const { trackId } = useParams();
@@ -79,6 +255,14 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
   const trackLevels = getTrackLevels(trackId || '');
 
   const [activeLevelId, setActiveLevelId] = useState<string | null>(null);
+  const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('ai_verse_checked_steps');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [code, setCode] = useState<string>('');
   const [running, setRunning] = useState(false);
   const [stdout, setStdout] = useState('');
@@ -187,7 +371,7 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
     try {
       const token = await user.getIdToken();
       const geminiKey = localStorage.getItem('gemini_api_key') || '';
-      
+
       if (!geminiKey) {
         throw new Error("Missing Gemini API Key. Please set it in the Settings menu (bottom left) to evaluate your code.");
       }
@@ -203,7 +387,7 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
         if (configRes.ok) {
           const { engine_url } = await configRes.json();
           // Fire a no-cors ping to trigger Render cold-start
-          await fetch(`${engine_url}/`, { mode: 'no-cors' }).catch(() => {});
+          await fetch(`${engine_url}/`, { mode: 'no-cors' }).catch(() => { });
         }
       } catch (e) { /* Silent wake-up */ }
 
@@ -214,7 +398,7 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Gemini-Key': geminiKey },
         body: JSON.stringify(payload),
       });
-      
+
       if (!res.ok) {
         const errorText = await res.text();
         if (res.status === 401 || res.status === 400 || errorText.toLowerCase().includes('api key')) {
@@ -222,7 +406,7 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
         }
         throw new Error(`API Error: ${errorText}`);
       }
-      
+
       const result = await res.json();
       setStdout(result.stdout || result.test_results?.map((t: any) => `Dataset ${t.dataset}: ${t.passed ? 'PASS' : 'FAIL'}`).join('\n') || '');
       setStderr(result.stderr || '');
@@ -358,13 +542,88 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
 
         <div className="p-5 pt-2 flex-1 overflow-y-auto custom-scrollbar space-y-5">
           {/* Objective */}
-          <section className="bg-[#0B1524]/50 border border-blue-500/10 rounded-2xl p-4 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-2xl" />
-            <div className="text-ui-2xs font-black uppercase tracking-[0.2em] font-mono text-blue-400 mb-2 flex items-center gap-2 pl-2">
-              <Terminal size={11} /> The_Objective
-            </div>
-            <p className="text-slate-300 leading-relaxed font-mono text-ui-xs whitespace-pre-wrap pl-2">{activeLevel.user_task}</p>
-          </section>
+          {(() => {
+            const parsedTask = parseUserTask(activeLevel.user_task);
+            const currentLevelChecked = Object.keys(checkedSteps).filter(k => k.startsWith(activeLevel.level_id) && checkedSteps[k]).length;
+            return (
+              <section className="bg-[#0B1524]/40 border border-blue-500/10 rounded-2xl p-5 relative overflow-hidden space-y-4">
+                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-2xl" />
+                <div className="text-ui-2xs font-black uppercase tracking-[0.2em] font-mono text-blue-400 mb-2 flex items-center justify-between pl-2">
+                  <span className="flex items-center gap-2"><Terminal size={11} /> Mission Objective</span>
+                  <span className="text-[10px] text-slate-400 bg-white/5 px-2.5 py-0.5 rounded-full font-mono font-normal">
+                    {currentLevelChecked} / {parsedTask.checklist.length} Steps
+                  </span>
+                </div>
+
+                <p className="text-slate-300 text-sm leading-relaxed pl-2 font-inter">
+                  {parsedTask.summary}
+                </p>
+
+                {/* Checklist of Steps */}
+                <div className="pl-2 space-y-2">
+                  {parsedTask.checklist.map((step, idx) => {
+                    const stepKey = `${activeLevel.level_id}_${idx}`;
+                    const isChecked = checkedSteps[stepKey] || false;
+                    return (
+                      <label
+                        key={idx}
+                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-200 cursor-pointer select-none ${isChecked
+                            ? 'bg-emerald-500/5 border-emerald-500/20 text-slate-400'
+                            : 'bg-[#060D1A] border-white/5 hover:border-blue-500/30 hover:bg-[#081324] text-slate-200'
+                          }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const newChecked = { ...checkedSteps, [stepKey]: e.target.checked };
+                            setCheckedSteps(newChecked);
+                            localStorage.setItem('ai_verse_checked_steps', JSON.stringify(newChecked));
+                          }}
+                          className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 shrink-0 cursor-pointer accent-blue-500"
+                        />
+                        <span className={`text-ui-xs font-mono leading-relaxed transition-all ${isChecked ? 'line-through opacity-60 text-emerald-400/80' : ''}`}>
+                          {step}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Expected Output Spec */}
+                {parsedTask.outputSpec && (
+                  <div className="mt-4 pl-2">
+                    <div className="bg-[#03060B] border border-white/5 rounded-xl p-3.5 space-y-2">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-amber-400/90 font-mono flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        Expected Output Format
+                      </div>
+                      <div className="text-ui-xs font-mono text-slate-400 bg-black/40 p-2.5 rounded-lg overflow-x-auto select-all border border-white/5">
+                        {parsedTask.outputSpec}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+            );
+          })()}
+
+          {/* ── EXAMPLE INPUT ──────────────────────────────────────── */}
+          {activeLevel.example_input &&
+            Object.keys(activeLevel.example_input).length > 0 &&
+            Object.values(activeLevel.example_input).some(v => v !== null && v !== undefined && String(v).trim() !== '') && (
+              <ExampleInputSection exampleInput={
+                // Normalise: if values are objects (not strings), JSON-stringify them
+                Object.fromEntries(
+                  Object.entries(activeLevel.example_input as Record<string, unknown>)
+                    .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+                    .map(([k, v]) => [
+                      k,
+                      typeof v === 'string' ? v : JSON.stringify(v, null, 2)
+                    ])
+                )
+              } />
+            )}
 
           {/* Contract */}
           <section>
