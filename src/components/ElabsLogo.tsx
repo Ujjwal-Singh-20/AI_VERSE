@@ -1,7 +1,7 @@
 import { useGLTF } from '@react-three/drei';
 
 export function ElabsLogo() {
-  const { scene } = useGLTF('/assets/ELABS_LOGO.glb');
+  const { scene } = useGLTF('/assets/AI_VERSE_clean.glb');
 
   return (
     <primitive
@@ -16,4 +16,4 @@ export function ElabsLogo() {
 }
 
 // Preload the logo
-useGLTF.preload('/assets/ELABS_LOGO.glb');
+useGLTF.preload('/assets/AI_VERSE_clean.glb');

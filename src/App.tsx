@@ -18,7 +18,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { SettingsModal } from './components/SettingsModal';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { BackendStatus } from './components/BackendStatus';
-import { ElabsLogo } from './components/ElabsLogo';
+// import { ElabsLogo } from './components/ElabsLogo';
 import { Settings, Map } from 'lucide-react';
 
 function AppContent() {
@@ -63,7 +63,7 @@ function AppContent() {
             <Canvas shadows={{ type: THREE.PCFShadowMap }} camera={{ position: [0, 12, 18], fov: 45 }}>
               <Suspense fallback={null}>
                 <OceanEnvironment />
-                <ElabsLogo />
+                {/* <ElabsLogo /> */}
                 <WorldMap activeTrack={activeTrack} setActiveTrack={setActiveTrack} />
                 <Connections />
               </Suspense>
