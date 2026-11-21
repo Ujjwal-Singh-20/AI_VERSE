@@ -31,7 +31,7 @@ const createGuestUser = (): User => {
     refreshToken: '',
     tenantId: null,
     delete: async () => {},
-    getIdToken: async () => 'guest',
+    getIdToken: async () => '',
     getIdTokenResult: async () => ({} as any),
     reload: async () => {},
     toJSON: () => ({}),

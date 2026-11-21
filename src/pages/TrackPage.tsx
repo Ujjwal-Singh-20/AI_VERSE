@@ -401,9 +401,17 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
 
       setStdout('Executing against hidden datasets...\n');
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Gemini-Key': geminiKey,
+      };
+      if (!isGuest && token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${backendUrl}/execute-and-evaluate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Gemini-Key': geminiKey },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -462,9 +470,11 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
     try {
       const token = await user.getIdToken();
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const res = await fetch(`${backendUrl}/levels/${activeLevel.level_id}/download-dataset`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const headers: Record<string, string> = {};
+      if (!isGuest && token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(`${backendUrl}/levels/${activeLevel.level_id}/download-dataset`, { headers });
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
