@@ -50,6 +50,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isMember, setIsMember] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
 
+  const recordGuestVisit = () => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    console.log('[ANALYTICS] Recording guest visit via:', `${backendUrl}/analytics/guest-visit`);
+    
+    fetch(`${backendUrl}/analytics/guest-visit`, { method: 'POST' })
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log('[ANALYTICS] Guest visit recorded successfully:', data);
+        sessionStorage.setItem('ai_verse_guest_visit_logged', 'true');
+      })
+      .catch((err) => {
+        console.warn('[ANALYTICS] Failed to log guest visit:', err);
+        sessionStorage.removeItem('ai_verse_guest_visit_logged');
+      });
+  };
+
   const continueAsGuest = () => {
     setIsGuest(true);
     localStorage.setItem('ai_verse_is_guest', 'true');
@@ -58,9 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Record guest visit counter in backend once per session
     if (!sessionStorage.getItem('ai_verse_guest_visit_logged')) {
-      sessionStorage.setItem('ai_verse_guest_visit_logged', 'true');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      fetch(`${backendUrl}/analytics/guest-visit`, { method: 'POST' }).catch(() => {});
+      recordGuestVisit();
     }
   };
 
@@ -112,9 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsGuest(true);
           setUser(createGuestUser());
           if (!sessionStorage.getItem('ai_verse_guest_visit_logged')) {
-            sessionStorage.setItem('ai_verse_guest_visit_logged', 'true');
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-            fetch(`${backendUrl}/analytics/guest-visit`, { method: 'POST' }).catch(() => {});
+            recordGuestVisit();
           }
         } else {
           setUser(null);
