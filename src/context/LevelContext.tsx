@@ -144,11 +144,11 @@ export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const getLevelData = (levelId: string) => {
     for (const track of tracks) {
-      const level = track.levels?.find(l => l.level_id === levelId);
+      const level = track.levels?.find((l: Level) => l.level_id === levelId);
       if (level) return level;
     }
     for (const track of DEFAULT_TRACKS) {
-      const level = track.levels?.find(l => l.level_id === levelId);
+      const level = track.levels?.find((l: Level) => l.level_id === levelId);
       if (level) return level;
     }
     return undefined;
