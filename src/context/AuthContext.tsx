@@ -13,9 +13,33 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isMember: boolean;
+  isGuest: boolean;
+  continueAsGuest: () => void;
   signIn: () => Promise<void>;
   logOut: () => Promise<void>;
 }
+
+const createGuestUser = (): User => {
+  return {
+    uid: 'guest_user',
+    displayName: 'Guest Explorer',
+    email: 'guest@sandbox.local',
+    emailVerified: false,
+    isAnonymous: true,
+    metadata: {} as any,
+    providerData: [],
+    refreshToken: '',
+    tenantId: null,
+    delete: async () => {},
+    getIdToken: async () => 'guest',
+    getIdTokenResult: async () => ({} as any),
+    reload: async () => {},
+    toJSON: () => ({}),
+    phoneNumber: null,
+    photoURL: null,
+    providerId: 'guest',
+  } as unknown as User;
+};
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -24,16 +48,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMember, setIsMember] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
+
+  const continueAsGuest = () => {
+    setIsGuest(true);
+    localStorage.setItem('ai_verse_is_guest', 'true');
+    setUser(createGuestUser());
+    setLoading(false);
+
+    // Record guest visit counter in backend once per session
+    if (!sessionStorage.getItem('ai_verse_guest_visit_logged')) {
+      sessionStorage.setItem('ai_verse_guest_visit_logged', 'true');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      fetch(`${backendUrl}/analytics/guest-visit`, { method: 'POST' }).catch(() => {});
+    }
+  };
 
   useEffect(() => {
+    const isGuestSaved = localStorage.getItem('ai_verse_is_guest') === 'true';
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
+        localStorage.removeItem('ai_verse_is_guest');
+        setIsGuest(false);
+
         // Check for KIIT domain
         if (!currentUser.email?.endsWith('@kiit.ac.in')) {
           await signOut(auth);
           setUser(null);
           setLoading(false);
-          alert('Access restricted to rolls@kiit.ac.in emails only.');
+          alert('Access restricted to rolls@kiit.ac.in emails only. Feel free to explore as Guest!');
           return;
         }
 
@@ -64,7 +108,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } else {
-        setUser(null);
+        if (isGuestSaved) {
+          setIsGuest(true);
+          setUser(createGuestUser());
+          if (!sessionStorage.getItem('ai_verse_guest_visit_logged')) {
+            sessionStorage.setItem('ai_verse_guest_visit_logged', 'true');
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+            fetch(`${backendUrl}/analytics/guest-visit`, { method: 'POST' }).catch(() => {});
+          }
+        } else {
+          setUser(null);
+          setIsGuest(false);
+        }
         setIsAdmin(false);
         setIsMember(false);
       }
@@ -82,10 +137,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logOut = () => signOut(auth);
+  const logOut = async () => {
+    localStorage.removeItem('ai_verse_is_guest');
+    setIsGuest(false);
+    setUser(null);
+    await signOut(auth);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isMember, signIn, logOut }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isMember, isGuest, continueAsGuest, signIn, logOut }}>
       {children}
     </AuthContext.Provider>
   );

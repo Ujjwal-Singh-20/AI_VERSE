@@ -19,12 +19,30 @@ interface CompletedTrack {
 import { CognitiveSignature } from '../components/CognitiveSignature/CognitiveSignature';
 
 export const ProfilePage: React.FC<{ onBack: () => void; onResume?: (trackId: string, levelId?: string) => void }> = ({ onBack, onResume }) => {
-  const { user, logOut } = useAuth();
+  const { user, logOut, isGuest, signIn } = useAuth();
   const [profileData, setProfileData] = useState<{ in_progress: ProgressTrack[], completed: CompletedTrack[] } | null>(null);
   const [loading, setLoading] = useState(true);
-  const rollNumber = user?.email?.split('@')[0] || "KIIT_000";
+  const rollNumber = isGuest ? "GUEST_EXPLORER" : (user?.email?.split('@')[0] || "KIIT_000");
 
   useEffect(() => {
+    if (isGuest) {
+      try {
+        const localCompleted: string[] = JSON.parse(localStorage.getItem('ai_verse_guest_completed') || '[]');
+        setProfileData({
+          in_progress: [],
+          completed: localCompleted.length > 0 ? [{
+            trackId: 'sandbox',
+            trackName: 'Sandbox Levels',
+            completedLevels: localCompleted
+          }] : []
+        });
+      } catch {
+        setProfileData({ in_progress: [], completed: [] });
+      }
+      setLoading(false);
+      return;
+    }
+
     const fetchProfile = async () => {
       try {
         const token = await user?.getIdToken();
@@ -52,7 +70,7 @@ export const ProfilePage: React.FC<{ onBack: () => void; onResume?: (trackId: st
     if (user) {
       fetchProfile();
     }
-  }, [user]);
+  }, [user, isGuest]);
 
   const hasProgress = profileData && (profileData.in_progress.length > 0 || profileData.completed.length > 0);
 
@@ -77,6 +95,21 @@ export const ProfilePage: React.FC<{ onBack: () => void; onResume?: (trackId: st
       </div>
 
       <div className="w-full max-w-2xl mx-auto flex flex-col gap-12">
+        {isGuest && (
+          <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-3xl p-6 text-center flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-left">
+              <h3 className="font-outfit font-black text-amber-900 uppercase tracking-tight text-sm">Guest Sandbox Mode</h3>
+              <p className="text-amber-800/80 text-xs font-medium font-inter mt-1">Your level progress is stored locally in this browser. Sign in with a KIIT email to sync to cloud and claim a roll number.</p>
+            </div>
+            <button
+              onClick={signIn}
+              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl text-xs uppercase tracking-wider font-mono shadow-md transition-all shrink-0 cursor-pointer"
+            >
+              Sign In with KIIT
+            </button>
+          </div>
+        )}
+
         {/* User Info */}
         <section className="text-center md:text-left flex flex-col md:flex-row gap-12 items-center bg-white border border-slate-100 p-10 rounded-[48px] shadow-2xl shadow-blue-900/5">
           <div className="w-64 h-64 bg-[#0B0F1A] rounded-[40px] overflow-hidden shadow-2xl relative group border-8 border-white flex items-center justify-center">

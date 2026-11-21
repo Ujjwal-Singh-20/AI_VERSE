@@ -22,7 +22,7 @@ import { BackendStatus } from './components/BackendStatus';
 import { Settings, Map } from 'lucide-react';
 
 function AppContent() {
-  const { user, loading, logOut, isAdmin } = useAuth();
+  const { user, loading, logOut, isAdmin, isGuest, signIn } = useAuth();
   const { brainrotMode, setBrainrotMode } = useLevels();
   const [activeTrack, setActiveTrack] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -139,6 +139,20 @@ function AppContent() {
 
             </div>
 
+            {/* Top-Center Guest Mode Indicator */}
+            {isGuest && (
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-3 px-5 py-2.5 bg-slate-900/80 backdrop-blur-xl border border-sky-400/40 rounded-full text-sky-100 text-[11px] font-mono shadow-2xl animate-in fade-in slide-in-from-top-4 duration-500">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="font-bold tracking-wider uppercase">GUEST SANDBOX • SAVED IN BROWSER</span>
+                <button
+                  onClick={signIn}
+                  className="px-3.5 py-1 bg-sky-500 hover:bg-sky-400 text-white rounded-full font-black uppercase text-[10px] tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer ml-1 shadow-md"
+                >
+                  SIGN IN WITH KIIT
+                </button>
+              </div>
+            )}
+
             {/* Top-Right: */}
             <div className="absolute top-6 right-8 flex gap-4 z-50 pointer-events-auto font-mono">
               <button
@@ -147,6 +161,8 @@ function AppContent() {
               >
                 {isAdmin
                   ? (brainrotMode ? "MOD_ROOM" : "CONTROL_CENTER")
+                  : isGuest
+                  ? (brainrotMode ? "GUEST_CARD" : "GUEST_PROFILE")
                   : (brainrotMode ? "THE_VAULT" : "PROFILE_JOURNEY")}
               </button>
               <button

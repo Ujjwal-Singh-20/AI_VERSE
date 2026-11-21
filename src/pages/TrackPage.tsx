@@ -248,7 +248,7 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
   const { trackId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { tracks, getTrackLevels, isLevelUnlocked, completedLevels, refreshProgress, isAdmin } = useLevels();
 
   const activeTrack = tracks.find(t => t.id === trackId);
@@ -340,6 +340,14 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
           return;
         }
 
+        if (isGuest) {
+          const savedCode = localStorage.getItem(`ai_verse_guest_code_${activeLevel.level_id}`);
+          if (active) {
+            setCode(savedCode || activeLevel.initial_code || '# Start coding here...');
+          }
+          return;
+        }
+
         try {
           const rollNumber = user.email!.split('@')[0];
           const codeRef = doc(db, 'users', rollNumber, 'level_code', activeLevel.level_id);
@@ -413,14 +421,25 @@ export const TrackPage = ({ onBack }: { onBack: () => void }) => {
       setPassed(result.passed);
       setAiFeedback(result.ai_feedback);
       if (result.passed) {
-        refreshProgress();
-        // Save correct code to Firebase
-        const rollNumber = user.email!.split('@')[0];
-        const codeRef = doc(db, 'users', rollNumber, 'level_code', activeLevel.level_id);
-        await setDoc(codeRef, {
-          code: code,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
+        if (isGuest) {
+          // Save locally for guest session
+          localStorage.setItem(`ai_verse_guest_code_${activeLevel.level_id}`, code);
+          const prevCompleted: string[] = JSON.parse(localStorage.getItem('ai_verse_guest_completed') || '[]');
+          if (!prevCompleted.includes(activeLevel.level_id)) {
+            const updated = [...prevCompleted, activeLevel.level_id];
+            localStorage.setItem('ai_verse_guest_completed', JSON.stringify(updated));
+          }
+          refreshProgress();
+        } else {
+          refreshProgress();
+          // Save correct code to Firebase
+          const rollNumber = user.email!.split('@')[0];
+          const codeRef = doc(db, 'users', rollNumber, 'level_code', activeLevel.level_id);
+          await setDoc(codeRef, {
+            code: code,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
       }
     } catch (e: any) {
       setStderr(`${e.message}`);

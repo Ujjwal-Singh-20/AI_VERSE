@@ -57,7 +57,7 @@ interface LevelContextType {
 const LevelContext = createContext<LevelContextType | null>(null);
 
 export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isGuest } = useAuth();
   const [tracks, setTracks] = useState<TrackData[]>([]);
   const [suggestedRoute, setSuggestedRoute] = useState<string[]>([]);
   const [completedLevels, setCompletedLevels] = useState<string[]>([]);
@@ -90,6 +90,16 @@ export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Fetch user progression
   const refreshProgress = React.useCallback(async () => {
     if (!user) return;
+    if (isGuest) {
+      try {
+        const localCompleted = JSON.parse(localStorage.getItem('ai_verse_guest_completed') || '[]');
+        setCompletedLevels(localCompleted);
+      } catch {
+        setCompletedLevels([]);
+      }
+      return;
+    }
+
     try {
       const token = await user.getIdToken();
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -108,7 +118,7 @@ export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       console.error("Error fetching progress", e);
     }
-  }, [user]);
+  }, [user, isGuest]);
 
   useEffect(() => {
     if (user) {
@@ -132,7 +142,7 @@ export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const isLevelUnlocked = (trackId: string, levelId: string) => {
-    if (isAdmin) return true;
+    if (isAdmin || isGuest) return true; // Option B: Open sandbox for guests and admins
     
     // A level is unlocked if it's the first level, OR if all previous levels in the sequence are completed
     const trackLevels = getTrackLevels(trackId);
