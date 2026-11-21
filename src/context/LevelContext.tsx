@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
+import { DEFAULT_TRACKS, DEFAULT_SUGGESTED_ROUTE } from '../data/defaultTracks';
 
 export interface Level {
   level_id: string;
@@ -24,6 +25,8 @@ export interface Level {
   training_dataset_files?: string[];
   guide_markdown?: string;
   example_input?: Record<string, unknown>;
+  unlocked?: boolean;
+  protected_code?: string;
 }
 
 export interface TrackData {
@@ -58,15 +61,17 @@ const LevelContext = createContext<LevelContextType | null>(null);
 
 export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAdmin, isGuest } = useAuth();
-  const [tracks, setTracks] = useState<TrackData[]>([]);
-  const [suggestedRoute, setSuggestedRoute] = useState<string[]>([]);
+  const [tracks, setTracks] = useState<TrackData[]>(DEFAULT_TRACKS);
+  const [suggestedRoute, setSuggestedRoute] = useState<string[]>(DEFAULT_SUGGESTED_ROUTE);
   const [completedLevels, setCompletedLevels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch static level data
   const refreshLevels = React.useCallback(async () => {
     try {
-      const token = user ? await user.getIdToken() : null;
+      // Only attach token if user is real KIIT member.
+      // In guest mode, do not send Bearer token that could cause 401 on un-migrated backends.
+      const token = (user && !isGuest) ? await user.getIdToken() : null;
       const headers: any = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
       
@@ -74,13 +79,17 @@ export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const res = await fetch(`${backendUrl}/levels`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setTracks(data.tracks || []);
-        setSuggestedRoute(data.suggested_route || []);
+        if (data.tracks && Array.isArray(data.tracks) && data.tracks.length > 0) {
+          setTracks(data.tracks);
+        }
+        if (data.suggested_route && Array.isArray(data.suggested_route) && data.suggested_route.length > 0) {
+          setSuggestedRoute(data.suggested_route);
+        }
       }
     } catch (e) {
-      console.error("Error fetching levels", e);
+      console.warn("Could not reach backend /levels, using built-in default tracks", e);
     }
-  }, [user]);
+  }, [user, isGuest]);
 
   // Initial levels fetch
   useEffect(() => {
@@ -135,14 +144,26 @@ export const LevelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const getLevelData = (levelId: string) => {
     for (const track of tracks) {
-      const level = track.levels.find(l => l.level_id === levelId);
+      const level = track.levels?.find(l => l.level_id === levelId);
+      if (level) return level;
+    }
+    for (const track of DEFAULT_TRACKS) {
+      const level = track.levels?.find(l => l.level_id === levelId);
       if (level) return level;
     }
     return undefined;
   };
 
   const isLevelUnlocked = (trackId: string, levelId: string) => {
-    if (isAdmin || isGuest) return true; // Option B: Open sandbox for guests and admins
+    if (isAdmin) return true;
+    if (isGuest) {
+      // In Guest Sandbox mode: Level 1 of each track is unlocked (B1, M1, G1, A1, D1)
+      const trackLevels = getTrackLevels(trackId);
+      if (trackLevels.length > 0 && trackLevels[0].level_id === levelId) {
+        return true;
+      }
+      return false;
+    }
     
     // A level is unlocked if it's the first level, OR if all previous levels in the sequence are completed
     const trackLevels = getTrackLevels(trackId);
